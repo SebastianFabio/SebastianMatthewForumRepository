@@ -4,6 +4,8 @@ from flask_oauthlib.client import OAuth
 from flask import render_template
 
 import pprint
+import pymongo
+import sys
 import os
 
 # This code originally from https://github.com/lepture/flask-oauthlib/blob/master/example/github.py
@@ -33,6 +35,13 @@ github = oauth.remote_app(
     authorize_url='https://github.com/login/oauth/authorize' #URL for github's OAuth login
 )
 
+def main():
+    connection_string = os.environ["MONGO_CONNECTION_STRING"]
+    db_name = os.environ["MONGO_DBNAME"]
+    
+    client = pymongo.MongoClient(connection_string)
+    db = client[db_name]
+    collection = db['rrerttttttt'] #1. put the name of your collection in the quotes
 
 #context processors run before templates are rendered and add variable(s) to the template's context
 #context processors must return a dictionary 
@@ -83,11 +92,6 @@ def renderPage1():
     else:
         user_data_pprint = '';
     return render_template('page1.html',dump_user_data=user_data_pprint)
-
-@app.route('/page2')
-def renderPage2():
-    followers=session['user_data']['followers']
-    return render_template('page2.html',show_user_data=followers)
 
 @app.route('/googleb4c3aeedcc2dd103.html')
 def render_google_verification():
