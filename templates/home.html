@@ -1,7 +1,17 @@
 {% extends "layout.html" %}
 
+{% set active_page = "home" %}
+
 {% block title %}Home{% endblock %}
 
 {% block content %}
-<h1>Home</h1>
+
+  <h1>Movie Forum</h1>
+	<form action="/answerForumOne" method="POST">
+	<br>
+	<h2>Type A Message</h2>
+	<input type="text" name="ques2">
+	<button type="submit">POST</button>
+	</form>
+	<pre>{{posts}}</pre>
 {% endblock %}
