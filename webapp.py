@@ -1,22 +1,21 @@
-from flask import Flask, redirect, url_for, session, request, jsonify
+from flask import Flask, redirect, url_for, session, request, jsonify, render_template, flash
+from markupsafe import Markup
+#from flask_apscheduler import APScheduler
+#from apscheduler.schedulers.background import BackgroundScheduler
 from flask_oauthlib.client import OAuth
-#from flask_oauthlib.contrib.apps import github #import to make requests to GitHub's OAuth
-from flask import render_template
+from bson.objectid import ObjectId
+from pymongo import DESCENDING
 
 import pprint
+import os
+import time
 import pymongo
 import sys
-import os
-
-# This code originally from https://github.com/lepture/flask-oauthlib/blob/master/example/github.py
-# Edited by P. Conrad for SPIS 2016 to add getting Client Id and Secret from
-# environment variables, so that this will work on Heroku.
-# Edited by S. Adams for Designing Software for the Web to add comments and remove flash messaging
-
+ 
 app = Flask(__name__)
 
 app.debug = False #Change this to False for production
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' #Remove once done debugging
+#os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' #Remove once done debugging
 
 app.secret_key = os.environ['SECRET_KEY'] #used to sign session cookies
 oauth = OAuth(app)
@@ -35,25 +34,31 @@ github = oauth.remote_app(
     authorize_url='https://github.com/login/oauth/authorize' #URL for github's OAuth login
 )
 
-def main():
-    connection_string = os.environ["MONGO_CONNECTION_STRING"]
-    db_name = os.environ["MONGO_DBNAME"]
-    
-    client = pymongo.MongoClient(connection_string)
-    db = client[db_name]
-    collection = db['rrerttttttt'] #1. put the name of your collection in the quotes
+#Connect to database
+url = os.environ["MONGO_CONNECTION_STRING"]
+client = pymongo.MongoClient(url)
+db = client[os.environ["MONGO_DBNAME"]]
+collection = db['posts'] #TODO: put the name of the collection here
+forumsposts = db['sebasforum']
+# Send a ping to confirm a successful connection
+try:
+    client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
 
 #context processors run before templates are rendered and add variable(s) to the template's context
 #context processors must return a dictionary 
 #this context processor adds the variable logged_in to the conext for all templates
 @app.context_processor
 def inject_logged_in():
-    is_logged_in = 'github_token' in session #this will be true if the token is in the session and false otherwise
-    return {"logged_in":is_logged_in}
+    return {"logged_in":('github_token' in session)}
 
 @app.route('/')
 def home():
-    return render_template('home.html')
+    posts=renderTheForum()
+    return render_template('home.html',posts=posts)
+
 
 #redirect to GitHub's OAuth page and confirm callback URL
 @app.route('/login')
@@ -63,41 +68,42 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
-    return render_template('message.html', message='You were logged out')
+    flash('You were logged out.')
+    return redirect('/')
 
 @app.route('/login/authorized')
 def authorized():
     resp = github.authorized_response()
     if resp is None:
         session.clear()
-        message = 'Access denied: reason=' + request.args['error'] + ' error=' + request.args['error_description'] + ' full=' + pprint.pformat(request.args)      
+        flash('Access denied: reason=' + request.args['error'] + ' error=' + request.args['error_description'] + ' full=' + pprint.pformat(request.args), 'error')      
     else:
         try:
             session['github_token'] = (resp['access_token'], '') #save the token to prove that the user logged in
             session['user_data']=github.get('user').data
-            #pprint.pprint(vars(github['/email']))
-            #pprint.pprint(vars(github['api/2/accounts/profile/']))
-            message='You were successfully logged in as ' + session['user_data']['login'] + '.'
+            message = 'You were successfully logged in as ' + session['user_data']['login'] + '.'
         except Exception as inst:
             session.clear()
             print(inst)
-            message='Unable to login, please try again.  '
-    return render_template('message.html', message=message)
+            message = 'Unable to login, please try again.', 'error'
+    return render_template('message.html', message=message) 
+@app.route('/answerForumOne',methods=['GET','POST'])
+def renderForumOneAnswers():
+    #if "user_data" in session:
+    forumPost=request.form['ques2']
+    doc = {"username":session['user_data']['login'],"text":forumPost}
+ 
+    forumsposts.insert_one(doc)
+    posts=renderTheForum()
 
+    return render_template('home.html',posts=posts)
+def renderTheForum():
+    option = []
+    for s in forumsposts.find().sort('_id', DESCENDING):
+        formatted_post = f"<h1>{s['username']}</h1><br><h2>{s['text']}</h2><br>"
+        option.append(formatted_post)
 
-@app.route('/page1')
-def renderPage1():
-    if 'user_data' in session:
-        user_data_pprint = pprint.pformat(session['user_data'])#format the user data nicely
-    else:
-        user_data_pprint = '';
-    return render_template('page1.html',dump_user_data=user_data_pprint)
-
-@app.route('/googleb4c3aeedcc2dd103.html')
-def render_google_verification():
-    return render_template('googleb4c3aeedcc2dd103.html')
-
-#the tokengetter is automatically called to check who is logged in.
+    return Markup("".join(option))   
 @github.tokengetter
 def get_github_oauth_token():
     return session['github_token']
