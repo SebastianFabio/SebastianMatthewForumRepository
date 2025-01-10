@@ -20,3 +20,4 @@ Werkzeug==2.2.2
 wheel
 WTForms
 Flask_oauthlib
+bson
