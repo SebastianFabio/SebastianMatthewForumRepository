@@ -21,3 +21,4 @@ wheel
 WTForms
 Flask_oauthlib
 bson
+pymongo
